@@ -1,0 +1,91 @@
+{
+  "setup": {
+    "dataset": "sklearn-digits",
+    "n_grad_samples": 1200,
+    "student_params": 2410,
+    "teacher_acc": 0.9756,
+    "temperature": 4.0
+  },
+  "pilot_A_spectrum": {
+    "KD_grad": {
+      "eff_rank": 23.44,
+      "norm_eff_rank": 0.0195,
+      "stable_rank": 7.24,
+      "ambient_dim": 1200,
+      "top1_energy": 0.1381,
+      "top5_energy": 0.5407,
+      "top10_energy": 0.824
+    },
+    "CE_grad": {
+      "eff_rank": 24.73,
+      "norm_eff_rank": 0.0206,
+      "stable_rank": 7.63,
+      "ambient_dim": 1200,
+      "top1_energy": 0.1311,
+      "top5_energy": 0.5318,
+      "top10_energy": 0.8118
+    },
+    "verdict": "KD lower-rank than CE"
+  },
+  "pilot_B_space": {
+    "param_grad_KD": {
+      "eff_rank": 23.44,
+      "norm_eff_rank": 0.0195,
+      "stable_rank": 7.24,
+      "ambient_dim": 1200,
+      "top1_energy": 0.1381,
+      "top5_energy": 0.5407,
+      "top10_energy": 0.824
+    },
+    "input_saliency_KD": {
+      "eff_rank": 9.56,
+      "norm_eff_rank": 0.1493,
+      "stable_rank": 3.93,
+      "ambient_dim": 64,
+      "top1_energy": 0.2543,
+      "top5_energy": 0.7748,
+      "top10_energy": 0.9353
+    },
+    "verdict": "param-grad lower norm-rank than saliency"
+  },
+  "pilot_C_structural": {
+    "corr_structuralfrac_vs_loss": 0.5849,
+    "corr_gradnorm_vs_loss": 0.8286,
+    "struct_frac_highloss": 0.8509,
+    "struct_frac_lowloss": 0.7685,
+    "verdict": "structural correlates with loss"
+  },
+  "pilot_D_coreset": {
+    "full": {
+      "mean": 0.9738,
+      "std": 0.0009,
+      "n": 1200
+    },
+    "d_optimal_grad": {
+      "mean": 0.9707,
+      "std": 0.0026,
+      "n": 600
+    },
+    "d_optimal_saliency": {
+      "mean": 0.9671,
+      "std": 0.0022,
+      "n": 600
+    },
+    "hard_highloss": {
+      "mean": 0.952,
+      "std": 0.0027,
+      "n": 600
+    },
+    "easy_lowloss": {
+      "mean": 0.9707,
+      "std": 0.0045,
+      "n": 600
+    },
+    "random": {
+      "mean": 0.9724,
+      "std": 0.0044,
+      "n": 600
+    }
+  },
+  "runtime_sec": 35.1
+}

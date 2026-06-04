@@ -1,0 +1,105 @@
+{
+  "intrinsic_eff_rank": 23.44,
+  "n_pool": 1200,
+  "budgets": [
+    24,
+    48,
+    96,
+    192,
+    384,
+    600
+  ],
+  "sweep": {
+    "24": {
+      "d_optimal": [
+        0.9093,
+        0.0102
+      ],
+      "random": [
+        0.8218,
+        0.0811
+      ],
+      "easy_lowloss": [
+        0.5507,
+        0.0579
+      ],
+      "lift_dopt_vs_random": 0.0876
+    },
+    "48": {
+      "d_optimal": [
+        0.9222,
+        0.0083
+      ],
+      "random": [
+        0.9053,
+        0.0165
+      ],
+      "easy_lowloss": [
+        0.8036,
+        0.0243
+      ],
+      "lift_dopt_vs_random": 0.0169
+    },
+    "96": {
+      "d_optimal": [
+        0.9467,
+        0.004
+      ],
+      "random": [
+        0.9409,
+        0.0072
+      ],
+      "easy_lowloss": [
+        0.9209,
+        0.0146
+      ],
+      "lift_dopt_vs_random": 0.0058
+    },
+    "192": {
+      "d_optimal": [
+        0.9529,
+        0.006
+      ],
+      "random": [
+        0.9631,
+        0.0039
+      ],
+      "easy_lowloss": [
+        0.9373,
+        0.0075
+      ],
+      "lift_dopt_vs_random": -0.0102
+    },
+    "384": {
+      "d_optimal": [
+        0.9662,
+        0.0033
+      ],
+      "random": [
+        0.9724,
+        0.0041
+      ],
+      "easy_lowloss": [
+        0.9676,
+        0.0033
+      ],
+      "lift_dopt_vs_random": -0.0062
+    },
+    "600": {
+      "d_optimal": [
+        0.9742,
+        0.003
+      ],
+      "random": [
+        0.9724,
+        0.0023
+      ],
+      "easy_lowloss": [
+        0.9738,
+        0.0041
+      ],
+      "lift_dopt_vs_random": 0.0018
+    }
+  },
+  "runtime_sec": 54.1
+}

@@ -1,0 +1,11 @@
+# Non-CUDA Python dependencies.
+# PyTorch with CUDA is installed separately by setup_server.sh
+# (pinning the CUDA wheel here would clash with different driver versions).
+numpy>=1.24
+scikit-learn>=1.3
+scipy>=1.11
+transformers>=4.40
+datasets>=2.18
+torchvision
+tqdm
+wandb

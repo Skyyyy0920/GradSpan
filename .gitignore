@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+.env
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+.ipynb_checkpoints/
+
+# Experiment outputs (regenerated; do not ship)
+runs/
+checkpoints/
+wandb/
+mlruns/
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+
+# Datasets — download via experiment scripts, do not commit
+data/
+datasets/
+
+# Logs
+*.log
+logs/
+
+# Claude Code local state (skills, etc. — install on server separately)
+.claude/
+
+# Upstream framework directory (separate project, has its own .git)
+Auto-claude-code-research-in-sleep/
+
+# Pilot JSON results are EVIDENCE — keep them
+!pilot/*.json
