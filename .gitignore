@@ -35,8 +35,12 @@ datasets/
 *.log
 logs/
 
-# Claude Code local state (skills, etc. — install on server separately)
-.claude/
+# Claude Code local state — block credentials/logs/sessions but explicitly
+# allow project-level skills/ so a server clone gets all slash commands
+# (/experiment-bridge, /run-experiment, /paper-writing, ...) without
+# a separate skills install step.
+.claude/*
+!.claude/skills/
 
 # Upstream framework directory (separate project, has its own .git)
 Auto-claude-code-research-in-sleep/
