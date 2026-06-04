@@ -17,16 +17,25 @@
 
 ## Shared-GPU coordination (the server is multi-tenant)
 
-A6000s (≈48 GB each) on this server are shared. Before every CUDA launch:
+A6000s (≈48 GB each) on this server are shared. **Before every CUDA-using `python ...`:**
 
-```bash
-# E0 / small E1: ~20 GB threshold is fine
-GPU=$(./scripts/wait_for_gpu.sh 20 30)
-# E2 / full distillation runs: keep ~40 GB to avoid OOM under another tenant's spike
-GPU=$(./scripts/wait_for_gpu.sh 40 30)
-export CUDA_VISIBLE_DEVICES=$GPU
-nvidia-smi --query-gpu=gpu_uuid -i "$GPU" --format=csv,noheader   # log this in the run record
-```
+1. Snapshot:
+   ```bash
+   nvidia-smi --query-gpu=index,name,memory.free,memory.used,utilization.gpu --format=csv
+   ```
+2. Pick the lowest-index GPU whose `memory.free` is above the block's threshold (table below),
+   then pin and log it:
+   ```bash
+   export CUDA_VISIBLE_DEVICES=<idx>
+   nvidia-smi --query-gpu=gpu_uuid -i <idx> --format=csv,noheader   # log this in the run record
+   ```
+3. If no GPU meets the threshold, poll every 30 s. One-liner if useful:
+   ```bash
+   while ! nvidia-smi --query-gpu=index,memory.free --format=csv,noheader,nounits \
+       | awk -F, '$2+0 >= 40000 {print $1; found=1; exit} END{exit !found}'; do sleep 30; done
+   ```
+4. If polling exceeds 60 min, **pause the suite**, write the wait into
+   `EXPERIMENT_TRACKER.md`'s GPU-coordination log, and do CPU iteration / writing instead.
 
 **Per-block GPU plan:**
 
@@ -40,10 +49,8 @@ nvidia-smi --query-gpu=gpu_uuid -i "$GPU" --format=csv,noheader   # log this in 
 | E5    | up to N GPUs | 20–40 GB      | Reduce parallelism |
 | E6    | 1 GPU       | 20 GB          | Wait |
 
-**If `wait_for_gpu.sh` polls >60 minutes**, pause the experiment suite, update
-`EXPERIMENT_TRACKER.md` with the wait, and switch to CPU iteration on `pilot/`-scale data or
-writing/analysis work until GPUs free up. Do NOT bypass the wait by running on a near-full GPU —
-the OOM-kill mid-run wastes more time than the wait would have.
+Do NOT bypass the threshold by running on a near-full GPU — an OOM-kill mid-run costs more
+than the wait. Checkpoint every epoch so a kill loses ≤ 1 epoch of work.
 
 ## Experiment Blocks
 

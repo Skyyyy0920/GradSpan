@@ -86,17 +86,17 @@ After experiments are decisive, invoke /paper-writing to draft a submission-read
 Hard limits: kill any single run exceeding 3× its estimated wall-clock; abort the suite
 if total GPU-day spend exceeds 25.
 
-Shared-GPU coordination (mandatory, the server is multi-tenant):
-- Before EVERY CUDA-using launch, run:
-      GPU=$(./scripts/wait_for_gpu.sh 40 30)
-      export CUDA_VISIBLE_DEVICES=$GPU
-  Drop the threshold to 20 GB for E0 and single-student E1 runs. Log the GPU UUID
-  (`nvidia-smi --query-gpu=gpu_uuid -i $GPU --format=csv,noheader`) in each run record.
+Shared-GPU coordination (mandatory; full pattern in CLAUDE.md > "Shared-GPU coordination"):
+- Before EVERY CUDA-using launch: snapshot via `nvidia-smi`, pick a GPU index whose
+  `memory.free` is at least 40 GB (or 20 GB for E0 / single-student E1), export
+  CUDA_VISIBLE_DEVICES to that index, and log its gpu_uuid in the run record.
+- If no GPU meets the threshold, poll every 30s. If polling exceeds 60 minutes, PAUSE the
+  experiment suite, note the wait in refine-logs/EXPERIMENT_TRACKER.md, and switch to CPU
+  iteration or writing work until a GPU frees.
 - Never claim "all GPUs". Multi-GPU runs (E2 parallel-across-seeds) must wait for N free
-  GPUs explicitly.
-- If wait_for_gpu.sh polls >60 minutes, PAUSE the experiment suite, note it in
-  refine-logs/EXPERIMENT_TRACKER.md, and switch to CPU iteration or writing work.
-- Checkpoint every epoch — another tenant's spike can OOM-kill the run.
+  GPUs explicitly. Checkpoint every epoch — another tenant's spike can OOM-kill the run.
+- Record every long wait (>10 min) and every OOM/kill in the GPU-coordination log in
+  EXPERIMENT_TRACKER.md, including GPU UUIDs. Honest end-to-end wall-clock depends on this.
 
 Non-negotiables:
 - Drop the falsified claim "KD gradients are more low-rank than CE" — pilot says wash.
@@ -139,43 +139,44 @@ Run `CUDA_TAG=cu121 bash setup_server.sh` after cloning to install everything an
 
 ### Shared-GPU coordination (the server is multi-tenant)
 
-The target server is shared. **A6000 GPUs (≈48 GB each) may be partly or fully occupied by
-other users at any time.** Every experiment command MUST coordinate before launching.
+**The target server is shared. A6000 GPUs (≈48 GB each) may be partly or fully occupied by
+other users at any time.** Every CUDA-using command MUST check first; never claim "all GPUs",
+never assume a specific index is free.
 
-**Snapshot at any time:**
-```bash
-nvidia-smi --query-gpu=index,name,memory.free,memory.used,utilization.gpu --format=csv
-```
+**Before every `python ...` that touches CUDA, do this:**
 
-**Wait for and pin a free GPU (the wrapper pattern every run uses):**
-```bash
-GPU=$(./scripts/wait_for_gpu.sh 40 30)   # need ≥40 GB free, poll every 30s; blocks until one is free
-export CUDA_VISIBLE_DEVICES=$GPU
-echo "[run] using GPU index $GPU"
-python experiments/<script>.py
-```
+1. Snapshot current GPU state:
+   ```bash
+   nvidia-smi --query-gpu=index,name,memory.free,memory.used,utilization.gpu --format=csv
+   ```
+2. Pick the lowest-index GPU whose `memory.free` is at least the threshold for your job:
+   - **E0 spectrum, single-student E1**: need ≥ **20 GB** free.
+   - **E2 full distillation, E3, E4, paper-writing fine-tunes**: need ≥ **40 GB** free
+     (leaves ~8 GB headroom against another tenant's spike → OOM-kill).
+3. Pin to that GPU and record its UUID in your run log:
+   ```bash
+   export CUDA_VISIBLE_DEVICES=<idx>
+   nvidia-smi --query-gpu=gpu_uuid -i <idx> --format=csv,noheader   # log this number
+   python experiments/<script>.py
+   ```
+4. **If no GPU meets the threshold**: poll (`sleep 30; goto 1`). One-liner if you want it:
+   ```bash
+   while ! nvidia-smi --query-gpu=index,memory.free --format=csv,noheader,nounits \
+       | awk -F, '$2+0 >= 40000 {print $1; found=1; exit} END{exit !found}'; do sleep 30; done
+   ```
+5. **If polling lasts >60 minutes**: STOP. Update `refine-logs/EXPERIMENT_TRACKER.md` with the
+   wait, then switch to CPU iteration on `pilot/`-scale data or writing/analysis work until a
+   GPU frees. Do NOT bypass the threshold by running on a near-full GPU — the OOM-kill mid-run
+   wastes more time than the wait.
 
-**Smaller jobs** (E0 spectrum, single-student E1) can drop the threshold:
-```bash
-GPU=$(./scripts/wait_for_gpu.sh 20 30)   # E0/E1-scale; ~20 GB is enough
-```
-
-**Bounded wait** (when you want to fall back to CPU iteration / writing if the box is full):
-```bash
-MAX_WAIT_MIN=60 GPU=$(./scripts/wait_for_gpu.sh 40) || { echo "no GPU for 1h; doing CPU work"; ... }
-```
-
-**Rules of thumb:**
-- **Pin one GPU per process** with `CUDA_VISIBLE_DEVICES=<idx>`. Never claim "all".
-- **Checkpoint every epoch** — another user's job spike can push yours into OOM, or you may
-  voluntarily release the GPU and resume later.
-- **Multi-GPU runs** (E2 parallel-across-seeds, paper-writing): wait for N free GPUs explicitly;
-  do not assume `torch.cuda.device_count()` is "yours".
-- **If `wait_for_gpu.sh` keeps polling >60 minutes**, pause the experiment suite, leave a note
-  in `refine-logs/EXPERIMENT_TRACKER.md`, and switch to CPU iteration (re-runnable on
-  `pilot/`-scale data) or writing work until a GPU frees.
-- **Log the GPU UUID** in run output (`nvidia-smi --query-gpu=gpu_uuid -i $GPU --format=csv,noheader`)
-  so a later OOM/kill can be correlated with another user's job, not blamed on the method.
+**Other rules:**
+- **Pin one GPU per process.** Multi-GPU runs (E2 parallel-across-seeds) must wait for N free
+  GPUs explicitly, not assume `torch.cuda.device_count()` is "yours".
+- **Checkpoint every epoch.** Another tenant's spike can OOM-kill yours; you should be able to
+  resume on a different GPU index without losing >1 epoch of work.
+- **Record every long wait (>10 min) and every OOM/kill** in `EXPERIMENT_TRACKER.md`'s
+  GPU-coordination log. The paper's end-to-end wall-clock claim depends on honest accounting
+  of waits and restarts.
 
 ## Key claims (for /result-to-claim, paper writing)
 
@@ -204,5 +205,7 @@ MAX_WAIT_MIN=60 GPU=$(./scripts/wait_for_gpu.sh 40) || { echo "no GPU for 1h; do
   selection is parameter-gradient space"*, with GradSpan-KD as the instantiation. Algorithmic
   novelty alone is 5–6/10 (recombination of LESS / GRAFT / TAGCOS / CCS / ICLR-2025-MD).
 - **The server is shared; never assume a GPU is yours.** Every CUDA-using `python ...` must be
-  preceded by `GPU=$(./scripts/wait_for_gpu.sh ...)` + `export CUDA_VISIBLE_DEVICES=$GPU`.
-  Log the GPU UUID. If polling exceeds 60 minutes, pause the suite and do CPU/writing work.
+  preceded by an `nvidia-smi` check, a `CUDA_VISIBLE_DEVICES` pin to a GPU with enough free
+  memory (40 GB for full distillation; 20 GB for E0/small-E1), and a logged `gpu_uuid`. If
+  polling exceeds 60 minutes, pause the suite and do CPU/writing work. Full pattern is in the
+  "Shared-GPU coordination" section above.

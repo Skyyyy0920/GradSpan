@@ -46,11 +46,12 @@ echo
 echo "==> Shared-GPU snapshot (this server is multi-tenant):"
 nvidia-smi --query-gpu=index,name,memory.free,memory.used,utilization.gpu --format=csv
 echo
-echo "  -> Before launching any experiment, pick a free GPU and pin it:"
-echo "        GPU=\$(./scripts/wait_for_gpu.sh 40 30)   # need >=40 GB free"
-echo "        export CUDA_VISIBLE_DEVICES=\$GPU"
-echo "     See CLAUDE.md > 'Shared-GPU coordination' for the full pattern."
-chmod +x scripts/wait_for_gpu.sh 2>/dev/null || true
+echo "  -> Before launching any experiment, pick a GPU whose memory.free is above"
+echo "     the per-job threshold (20 GB for E0/small-E1, 40 GB for E2+), then:"
+echo "        export CUDA_VISIBLE_DEVICES=<idx>"
+echo "        nvidia-smi --query-gpu=gpu_uuid -i <idx> --format=csv,noheader    # log this"
+echo "     See CLAUDE.md > 'Shared-GPU coordination' for the full pattern,"
+echo "     including the >60-min wait fallback and the OOM-recovery rules."
 
 # ---- 4. Optional: Codex MCP ----
 echo
