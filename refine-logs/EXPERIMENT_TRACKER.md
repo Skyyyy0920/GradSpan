@@ -25,3 +25,13 @@ Update the Status column as runs complete. Blocks gated by E1 must not start unt
 
 ## Status legend
 ☐ not started · ⏳ running · ✅ done · ⛔ blocked · ❌ failed/killed
+🕐 waiting for GPU (server full) — record start time + threshold used
+
+## GPU-coordination log
+Record every long GPU wait (>10 min) and every OOM/kill caused by tenant displacement, with
+GPU UUID and approximate competing-tenant memory footprint. This is for honest end-to-end
+wall-clock accounting in the paper's efficiency section.
+
+| Date / time | Block / run | GPU index | GPU UUID | Event | Notes |
+|-------------|-------------|-----------|----------|-------|-------|
+| _example_   | E2 seed 3   | 2         | GPU-xxxx | OOM-kill at epoch 47 | another job spiked to 44GB; restarted on idx 5 |

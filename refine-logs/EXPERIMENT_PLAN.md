@@ -15,6 +15,36 @@
 - **Seeds**: 5 per cell (variance is a reported metric, not just a confidence interval).
 - **Metric**: student test accuracy/score, its std across seeds, and end-to-end wall-clock.
 
+## Shared-GPU coordination (the server is multi-tenant)
+
+A6000s (≈48 GB each) on this server are shared. Before every CUDA launch:
+
+```bash
+# E0 / small E1: ~20 GB threshold is fine
+GPU=$(./scripts/wait_for_gpu.sh 20 30)
+# E2 / full distillation runs: keep ~40 GB to avoid OOM under another tenant's spike
+GPU=$(./scripts/wait_for_gpu.sh 40 30)
+export CUDA_VISIBLE_DEVICES=$GPU
+nvidia-smi --query-gpu=gpu_uuid -i "$GPU" --format=csv,noheader   # log this in the run record
+```
+
+**Per-block GPU plan:**
+
+| Block | Concurrency | Min free / GPU | Strategy if box is full |
+|-------|-------------|----------------|--------------------------|
+| E0    | 1 GPU       | 20 GB          | Wait — block is short (~30 min) |
+| E1    | 1 GPU per modality (can serialize) | 20 GB | Serialize vision then text |
+| E2    | up to N GPUs (parallel seeds) | 40 GB | Reduce parallelism, serialize seeds |
+| E3    | 1–2 GPUs    | 40 GB          | Serialize KD vs CE legs |
+| E4    | 1 GPU       | 40 GB          | Wait |
+| E5    | up to N GPUs | 20–40 GB      | Reduce parallelism |
+| E6    | 1 GPU       | 20 GB          | Wait |
+
+**If `wait_for_gpu.sh` polls >60 minutes**, pause the experiment suite, update
+`EXPERIMENT_TRACKER.md` with the wait, and switch to CPU iteration on `pilot/`-scale data or
+writing/analysis work until GPUs free up. Do NOT bypass the wait by running on a near-full GPU —
+the OOM-kill mid-run wastes more time than the wait would have.
+
 ## Experiment Blocks
 
 ### E0 — Diagnostic backbone  (~0.5 GPU-day)

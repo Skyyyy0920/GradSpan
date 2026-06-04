@@ -41,6 +41,17 @@ for i in range(torch.cuda.device_count()):
     print(f"    [{i}] {props.name}  ({props.total_memory / 1024**3:.1f} GiB)")
 PY
 
+# ---- 3.5. Shared-GPU snapshot ----
+echo
+echo "==> Shared-GPU snapshot (this server is multi-tenant):"
+nvidia-smi --query-gpu=index,name,memory.free,memory.used,utilization.gpu --format=csv
+echo
+echo "  -> Before launching any experiment, pick a free GPU and pin it:"
+echo "        GPU=\$(./scripts/wait_for_gpu.sh 40 30)   # need >=40 GB free"
+echo "        export CUDA_VISIBLE_DEVICES=\$GPU"
+echo "     See CLAUDE.md > 'Shared-GPU coordination' for the full pattern."
+chmod +x scripts/wait_for_gpu.sh 2>/dev/null || true
+
 # ---- 4. Optional: Codex MCP ----
 echo
 echo "==> [4/4] (optional) Wiring Codex MCP for /research-review and /novelty-check cross-checks"

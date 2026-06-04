@@ -86,6 +86,18 @@ After experiments are decisive, invoke /paper-writing to draft a submission-read
 Hard limits: kill any single run exceeding 3× its estimated wall-clock; abort the suite
 if total GPU-day spend exceeds 25.
 
+Shared-GPU coordination (mandatory, the server is multi-tenant):
+- Before EVERY CUDA-using launch, run:
+      GPU=$(./scripts/wait_for_gpu.sh 40 30)
+      export CUDA_VISIBLE_DEVICES=$GPU
+  Drop the threshold to 20 GB for E0 and single-student E1 runs. Log the GPU UUID
+  (`nvidia-smi --query-gpu=gpu_uuid -i $GPU --format=csv,noheader`) in each run record.
+- Never claim "all GPUs". Multi-GPU runs (E2 parallel-across-seeds) must wait for N free
+  GPUs explicitly.
+- If wait_for_gpu.sh polls >60 minutes, PAUSE the experiment suite, note it in
+  refine-logs/EXPERIMENT_TRACKER.md, and switch to CPU iteration or writing work.
+- Checkpoint every epoch — another tenant's spike can OOM-kill the run.
+
 Non-negotiables:
 - Drop the falsified claim "KD gradients are more low-rank than CE" — pilot says wash.
 - Drop the falsified claim "structural ≠ hard" — pilot correlation is +0.59.
@@ -125,6 +137,46 @@ Non-negotiables:
 
 Run `CUDA_TAG=cu121 bash setup_server.sh` after cloning to install everything and verify CUDA.
 
+### Shared-GPU coordination (the server is multi-tenant)
+
+The target server is shared. **A6000 GPUs (≈48 GB each) may be partly or fully occupied by
+other users at any time.** Every experiment command MUST coordinate before launching.
+
+**Snapshot at any time:**
+```bash
+nvidia-smi --query-gpu=index,name,memory.free,memory.used,utilization.gpu --format=csv
+```
+
+**Wait for and pin a free GPU (the wrapper pattern every run uses):**
+```bash
+GPU=$(./scripts/wait_for_gpu.sh 40 30)   # need ≥40 GB free, poll every 30s; blocks until one is free
+export CUDA_VISIBLE_DEVICES=$GPU
+echo "[run] using GPU index $GPU"
+python experiments/<script>.py
+```
+
+**Smaller jobs** (E0 spectrum, single-student E1) can drop the threshold:
+```bash
+GPU=$(./scripts/wait_for_gpu.sh 20 30)   # E0/E1-scale; ~20 GB is enough
+```
+
+**Bounded wait** (when you want to fall back to CPU iteration / writing if the box is full):
+```bash
+MAX_WAIT_MIN=60 GPU=$(./scripts/wait_for_gpu.sh 40) || { echo "no GPU for 1h; doing CPU work"; ... }
+```
+
+**Rules of thumb:**
+- **Pin one GPU per process** with `CUDA_VISIBLE_DEVICES=<idx>`. Never claim "all".
+- **Checkpoint every epoch** — another user's job spike can push yours into OOM, or you may
+  voluntarily release the GPU and resume later.
+- **Multi-GPU runs** (E2 parallel-across-seeds, paper-writing): wait for N free GPUs explicitly;
+  do not assume `torch.cuda.device_count()` is "yours".
+- **If `wait_for_gpu.sh` keeps polling >60 minutes**, pause the experiment suite, leave a note
+  in `refine-logs/EXPERIMENT_TRACKER.md`, and switch to CPU iteration (re-runnable on
+  `pilot/`-scale data) or writing work until a GPU frees.
+- **Log the GPU UUID** in run output (`nvidia-smi --query-gpu=gpu_uuid -i $GPU --format=csv,noheader`)
+  so a later OOM/kill can be correlated with another user's job, not blamed on the method.
+
 ## Key claims (for /result-to-claim, paper writing)
 
 - **C1** — D-optimal coreset over the principal KD-gradient subspace beats random / EL2N /
@@ -151,3 +203,6 @@ Run `CUDA_TAG=cu121 bash setup_server.sh` after cloning to install everything an
 - **Lead with the finding, not the algorithm.** The paper is *"the right space for KD coreset
   selection is parameter-gradient space"*, with GradSpan-KD as the instantiation. Algorithmic
   novelty alone is 5–6/10 (recombination of LESS / GRAFT / TAGCOS / CCS / ICLR-2025-MD).
+- **The server is shared; never assume a GPU is yours.** Every CUDA-using `python ...` must be
+  preceded by `GPU=$(./scripts/wait_for_gpu.sh ...)` + `export CUDA_VISIBLE_DEVICES=$GPU`.
+  Log the GPU UUID. If polling exceeds 60 minutes, pause the suite and do CPU/writing work.
